@@ -1,6 +1,7 @@
 import pandas as pd
 import sys
 from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QFileDialog, QLabel, QVBoxLayout
+from PyQt5 import QtWidgets
 from PyQt5.QtCore import Qt
 import pandas as pd
 import numpy as np
@@ -14,6 +15,14 @@ import shutil
 import os
 from time import sleep
 from PyQt5.QtCore import QObject, QThread, pyqtSignal
+from PyQt5.QtGui     import *
+from PyQt5.QtCore    import *
+from PyQt5.QtWidgets import *
+from PyQt5 import QtGui
+import sys
+from PyQt5.QtWidgets import QApplication, QMainWindow, QTableWidget, QVBoxLayout, QPushButton, QWidget, QFileDialog
+import openpyxl
+from datetime import date
 
 
 
@@ -219,33 +228,130 @@ class ExcelApp(QWidget):
         self.save_file_t = None
         self.initUI()
 
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setPen(Qt.black)
+        painter.drawLine(0, 140, 800, 140)
+
     def initUI(self):
+
+        validarValor = QDoubleValidator(0.00, 999.99, 2)
+        validarValor.setNotation(QDoubleValidator.StandardNotation)
+        validarValor.setDecimals(2)
+
+        self.setFixedWidth(800)
+        self.setFixedHeight(600)
         self.setWindowTitle('Excel Data Processing')
 
         self.openButton = QPushButton('Open Excel File', self)
         self.openButton.clicked.connect(self.openFile)
+        self.openButton.move(20, 10)
+        self.openButton.resize(760, 30)
 
         self.downloadButton = QPushButton('Select new folder name', self)
         self.downloadButton.clicked.connect(self.downloadFile)
         self.downloadButton.setEnabled(False)
+        self.downloadButton.move(20, 50)
+        self.downloadButton.resize(760, 30)
 
         self.processButton = QPushButton('Start Processing', self)
         self.processButton.clicked.connect(self.start_processing)
         self.processButton.setEnabled(False)
+        self.processButton.move(20, 90)
+        self.processButton.resize(760, 30)
 
         self.label = QLabel('', self)
         self.name_file = ""
+        self.label.move(20, 120)
+
+        self.label_settings = QLabel('Settings', self)
+        self.label_settings.move(360, 150)
+        myFont = QtGui.QFont()
+        myFont.setBold(True)
+        myFont.setRawMode(True)
+        self.label_settings.setFont(myFont)
+
+        self.label_settings_type_of_graphics = QLabel('Types of graphs:', self)
+        self.label_settings_type_of_graphics.move(20, 170)
+
+        self.cb_stress_time = QCheckBox("Stress(Time)", self)
+        self.cb_stress_time.move(20, 190)
+        self.cb_stress_time.show()
+
+        self.cb_stress_strain = QCheckBox("Stress(Strain)", self)
+        self.cb_stress_strain.move(20, 210)
+        self.cb_stress_strain.show()
+
+        self.label_settings_geom_params = QLabel('Set geometric parameters:', self)
+        self.label_settings_geom_params.move(305, 170)
+
+        self.cb_basic_geom_params = QCheckBox("Basic (Stress will not be recalculated)", self)
+        self.cb_basic_geom_params.move(305, 190)
+        self.cb_basic_geom_params.show()
+
+        self.or_label = QLabel('or', self)
+        self.or_label.move(395, 210)
+
+        self.label_length = QLabel('length (mm):', self)
+        self.label_length.move(305, 230)
+
+
+        self.textbox_length = QLineEdit(self)
+        self.textbox_length.move(410, 230)
+        self.textbox_length.resize(100, 15)
+
+
+        self.label_width = QLabel('width (mm):', self)
+        self.label_width.move(305, 250)
+
+        self.textbox_width = QLineEdit(self)
+        self.textbox_width.move(410, 250)
+        self.textbox_width.resize(100, 15)
+
+
+        self.label_thickness = QLabel('thickness (mm):', self)
+        self.label_thickness.move(305, 270)
+
+        self.textbox_thickness = QLineEdit(self)
+        self.textbox_thickness.move(410, 270)
+        self.textbox_thickness.resize(100, 15)
+
+        self.label_settings_speed_params = QLabel('Speed mode:', self)
+        self.label_settings_speed_params.move(630, 170)
+
+        self.cb_speed_mode_one = QCheckBox("Mode 1 (a2=30, a4=3)", self)
+        self.cb_speed_mode_one.move(630, 190)
+        self.cb_speed_mode_one.setChecked(True)
+
+        self.cb_speed_mode_two = QCheckBox("Mode 2 (a2=20, a4=2)", self)
+        self.cb_speed_mode_two.move(630, 210)
+        self.cb_speed_mode_two.show()
+
+        self.meta_data_table = QTableWidget(self)
+        self.meta_data_table.setColumnCount(2)
+        self.meta_data_table.setRowCount(10)
+        self.meta_data_table.move(20, 320)
+        self.meta_data_table.resize(760, 270)
+        self.meta_data_table.show()
+        self.meta_data_table.setItem(0, 0, QtWidgets.QTableWidgetItem("Дата"))
+        self.meta_data_table.setItem(0, 1, QtWidgets.QTableWidgetItem(str(date.today())))
+        self.meta_data_table.setItem(1, 0, QtWidgets.QTableWidgetItem("Экспериментатор (Имя Фамилия)"))
+
+        self.label_meta_data = QLabel('Meta Data', self)
+        self.label_meta_data.move(360, 300)
+        self.label_meta_data.setFont(myFont)
 
 
 
-        layout = QVBoxLayout()
-        layout.addWidget(self.openButton)
-        layout.addWidget(self.downloadButton)
-        layout.addWidget(self.processButton)
-        layout.addWidget(self.label)
 
 
-        self.setLayout(layout)
+
+
+
+
+
+
+
 
     def openFile(self):
         options = QFileDialog.Options()
