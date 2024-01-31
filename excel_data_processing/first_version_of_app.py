@@ -23,6 +23,54 @@ import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow, QTableWidget, QVBoxLayout, QPushButton, QWidget, QFileDialog
 import openpyxl
 from datetime import date
+import sys
+import matplotlib
+matplotlib.use('Qt5Agg')
+
+from PyQt5 import QtCore, QtGui, QtWidgets
+
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT as NavigationToolbar
+from matplotlib.figure import Figure
+from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QLabel, QVBoxLayout, QWidget
+
+
+# -------------------------------------------------- class to crate dynamic graphics
+
+class MplCanvas(FigureCanvasQTAgg):
+
+    def __init__(self, parent=None, width=5, height=4, dpi=100):
+        self.fig = Figure(figsize=(width, height), dpi=dpi)
+        self.axes = None
+        # self.axes = self.fig.add_subplot(111)
+        super(MplCanvas, self).__init__(self.fig)
+
+
+class Create_Graph_Window(QtWidgets.QMainWindow):
+
+    def __init__(self,data_to_build, *args, **kwargs):
+        super(Create_Graph_Window, self).__init__(*args, **kwargs)
+
+        sc = MplCanvas(self, width=5, height=4, dpi=100)
+        sc.axes = sc.fig.add_subplot(111, title=data_to_build[2], xlabel=data_to_build[3], ylabel=data_to_build[4])
+        sc.axes.plot(data_to_build[0], data_to_build[1])
+
+
+
+
+        # Create toolbar, passing canvas as first parament, parent (self, the MainWindow) as second.
+        toolbar = NavigationToolbar(sc, self)
+
+        layout = QtWidgets.QVBoxLayout()
+        layout.addWidget(toolbar)
+        layout.addWidget(sc)
+
+        # Create a placeholder widget to hold our toolbar and canvas.
+        widget = QtWidgets.QWidget()
+        widget.setLayout(layout)
+        self.setCentralWidget(widget)
+
+        self.show()
+# -----------------------------------------------------------------------
 
 
 
@@ -162,17 +210,23 @@ def data_preparation(df, flag_recalc, geom_params, k_press=3):
     return [[final_data, tmp_X, tmp_Y, maxi_points, mini_points], [tmp_X_new_strain, tmp_Y, maxi_points_new_strain, mini_points_new_strain]]
 
 
-def create_plot(x, y, maxi_points, mini_points, name, path_to_write, flag_strain, naming_stuff):
+def create_plot(x, y, maxi_points, mini_points, name, path_to_write, flag_strain, naming_stuff, main_class_prop, ind_of_window):
+    data_for_graph_window = [x, y]
     plt.clf()
     if name in naming_stuff.keys():
         plt.title(naming_stuff[name])
+        data_for_graph_window.append(naming_stuff[name])
     else:
         plt.title(name)
+        data_for_graph_window.append(name)
     if flag_strain:
         plt.xlabel("Strain, %")
+        data_for_graph_window.append("Strain, %")
     else:
         plt.xlabel("Time, s")
+        data_for_graph_window.append("Time, s")
     plt.ylabel("Stress, N/mm^2")
+    data_for_graph_window.append("Stress, N/mm^2")
     plt.plot(x, y)
     for i in maxi_points:
         plt.plot(i[0], i[1], 'o', color="red")
@@ -187,18 +241,20 @@ def create_plot(x, y, maxi_points, mini_points, name, path_to_write, flag_strain
     else:
         tmp_path = os.path.join(path_to_write, name+'.png')
     plt.savefig(tmp_path)
+    main_class_prop.additional_windows[ind_of_window] = Create_Graph_Window(data_for_graph_window)
     # plt.show()
 
 
-def create_plots(graphiks_stuff, path_to_write, flag_strain, naming_stuff):
+def create_plots(graphiks_stuff, path_to_write, flag_strain, naming_stuff, main_class_prop, ind_of_window):
     xs = []
     ys = []
     names = []
     for i in graphiks_stuff.keys():
-        create_plot(graphiks_stuff[i][0], graphiks_stuff[i][1], graphiks_stuff[i][2], graphiks_stuff[i][3], i, path_to_write, flag_strain, naming_stuff)
+        create_plot(graphiks_stuff[i][0], graphiks_stuff[i][1], graphiks_stuff[i][2], graphiks_stuff[i][3], i, path_to_write, flag_strain, naming_stuff, main_class_prop, ind_of_window)
         xs.append(graphiks_stuff[i][0])
         ys.append(graphiks_stuff[i][1])
         names.append(i)
+        ind_of_window+=1
     plt.clf()
     colors = ["blue", "orange", "purple", "brown", "pink", "olive", "cyan"]
     plt.title("All values")
@@ -216,6 +272,7 @@ def create_plots(graphiks_stuff, path_to_write, flag_strain, naming_stuff):
     else:
         tmp_path = os.path.join(path_to_write, 'all_in_one.png')
     plt.savefig(tmp_path)
+    return ind_of_window
 
 
 def calc_area_under_curve(coords_x, coords_y, x_value=1e9): # y[координта ] x_value - до какой координты по x интегрировать
@@ -232,7 +289,7 @@ def calc_area_under_curve(coords_x, coords_y, x_value=1e9): # y[координт
     area = simpson(np.array(y_tmp), np.array(x_tmp))
     return area
 
-def create_new_table(path, path_to_write, additional_data, meta_data_table_values):
+def create_new_table(main_class_prop, path, path_to_write, additional_data, meta_data_table_values):
     os.mkdir(path_to_write)
     tmp = xl.load_workbook(path)
     sheets_names = tmp.sheetnames
@@ -265,11 +322,11 @@ def create_new_table(path, path_to_write, additional_data, meta_data_table_value
          "а0": "a6"}
 
 
-
+    ind_of_already_opened_windows = 0
     if additional_data[2]:
-        create_plots(graphiks_stuff, path_to_write, False, comparison_name_to_other)
+        ind_of_already_opened_windows = create_plots(graphiks_stuff, path_to_write, False, comparison_name_to_other, main_class_prop, ind_of_already_opened_windows)
     if additional_data[3]:
-        create_plots(strain_graphiks_stuff_dict, path_to_write, additional_data[3], comparison_name_to_other)
+        ind_of_already_opened_windows = create_plots(strain_graphiks_stuff_dict, path_to_write, additional_data[3], comparison_name_to_other, main_class_prop, ind_of_already_opened_windows)
     path_tmp = os.path.join(path_to_write, 'output.xlsx')
     with pd.ExcelWriter(path_tmp) as writer:
         for i in new_sheets.keys():
@@ -300,10 +357,14 @@ def create_new_table(path, path_to_write, additional_data, meta_data_table_value
 
 
 
+
+
+
 class ExcelApp(QWidget):
     def __init__(self):
         super().__init__()
         self.save_file_t = None
+        self.additional_windows = [None] * 20
         self.initUI()
 
     def paintEvent(self, event):
@@ -487,7 +548,7 @@ class ExcelApp(QWidget):
                 meta_data_table_values.append([i, comparison_name_to_other[i]])
 
             add_data = [flag_speed_mode_one, flag_speed_mode_two, flag_stress_time, flag_stress_strain, recalc_stress, geom_params]
-            create_new_table(self.name_file, self.save_file_t, add_data, meta_data_table_values)
+            create_new_table(self, self.name_file, self.save_file_t, add_data, meta_data_table_values)
             # shutil.copyfile(self.new_file, save_file)
             self.label.setText(f'Select table')
 
