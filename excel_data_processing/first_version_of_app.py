@@ -35,7 +35,11 @@ def sum_massives(x, y):
         tmp.append(x[i] + y[i])
     return tmp
 
-def data_preparation(df, k_press=3):
+def data_preparation(df, flag_recalc, geom_params, k_press=3):
+
+    if flag_recalc:
+        square_of_example = geom_params[-1] * geom_params[-2]
+
 
     df_head_stuff = df.iloc[:3]
     df = df.iloc[3:]
@@ -44,7 +48,10 @@ def data_preparation(df, k_press=3):
     time = df[3].tolist()
     exten = df[4].tolist()
     strain = df[5].tolist()
-    stress = df[6].tolist()
+    if flag_recalc:
+        stress = [i / square_of_example for i in force]
+    else:
+        stress = df[6].tolist()
 
     new_data = [] # данные в которых мы усреднили все значения где время одинаковое
     sum_pos = pos[0]
@@ -76,31 +83,42 @@ def data_preparation(df, k_press=3):
 
     x = np.array([i[2] for i in new_data])
     y = np.array([i[-1] for i in new_data])
+    x_new_strain = np.array([i[4] for i in new_data])
     y_smooth = savgol_filter(y, 50, 3)
     y_smooth = y_smooth.tolist()
 
     local_maxis = []
+    local_maxis_new_strain = []
     for i in range(len(y_smooth)):
         tmp = []
         for j in y_smooth[max(0, i - int(len(y_smooth) * 0.1)): min(len(y_smooth), i + int(len(y_smooth) * 0.1))]:
             tmp.append(j)
         if max(tmp) == y_smooth[i]:
             local_maxis.append([y_smooth[i], x[i]])
+            local_maxis_new_strain.append([y_smooth[i], x_new_strain[i]])
 
     local_maxis.sort()
     local_maxis = local_maxis[::-1]
 
+    local_maxis_new_strain.sort()
+    local_maxis_new_strain = local_maxis_new_strain[::-1]
+
 
     local_mins = []
+    local_mins_new_strain = []
     for i in range(len(y_smooth)):
         tmp = []
         for j in y_smooth[max(0, i - int(len(y_smooth) * 0.05)): min(len(y_smooth), i + int(len(y_smooth) * 0.05))]:
             tmp.append(j)
         if min(tmp) == y_smooth[i]:
             local_mins.append([y_smooth[i], x[i]])
+            local_mins_new_strain.append([y_smooth[i], x_new_strain[i]])
 
     local_mins.sort()
     local_mins = local_mins[::-1]
+
+    local_mins_new_strain.sort()
+    local_mins_new_strain = local_mins_new_strain[::-1]
 
     maxi_points = [[i[-1], i[0]] for i in local_maxis]
     mini_points = [[i[-1], i[0]] for i in local_mins]
@@ -110,6 +128,14 @@ def data_preparation(df, k_press=3):
     del mini_points[-1]
     del mini_points[0]
 
+
+    maxi_points_new_strain = [[i[-1], i[0]] for i in local_maxis_new_strain]
+    mini_points_new_strain = [[i[-1], i[0]] for i in local_mins_new_strain]
+    maxi_points_new_strain.sort()
+    mini_points_new_strain.sort()
+
+    del mini_points_new_strain[-1]
+    del mini_points_new_strain[0]
 
     final_data = []
     ind = 0
@@ -128,17 +154,24 @@ def data_preparation(df, k_press=3):
         final_data[i] = [i + 1] + final_data[i]
     tmp_X = np.array([i[3] for i in final_data])
     tmp_Y = np.array([i[-1] for i in final_data])
+    tmp_X_new_strain = np.array([i[5] for i in final_data])
     final_data = np.array(final_data)
     final_data = pd.DataFrame(final_data)
     # print(type(final_data), type(df_head_stuff))
     final_data = pd.concat([df_head_stuff, final_data])
-    return [final_data, tmp_X, tmp_Y, maxi_points, mini_points]
+    return [[final_data, tmp_X, tmp_Y, maxi_points, mini_points], [tmp_X_new_strain, tmp_Y, maxi_points_new_strain, mini_points_new_strain]]
 
 
-def create_plot(x, y, maxi_points, mini_points, name, path_to_write):
+def create_plot(x, y, maxi_points, mini_points, name, path_to_write, flag_strain, naming_stuff):
     plt.clf()
-    plt.title(name)
-    plt.xlabel("Time, s")
+    if name in naming_stuff.keys():
+        plt.title(naming_stuff[name])
+    else:
+        plt.title(name)
+    if flag_strain:
+        plt.xlabel("Strain, %")
+    else:
+        plt.xlabel("Time, s")
     plt.ylabel("Stress, N/mm^2")
     plt.plot(x, y)
     for i in maxi_points:
@@ -147,29 +180,41 @@ def create_plot(x, y, maxi_points, mini_points, name, path_to_write):
     for i in mini_points:
         plt.plot(i[0], i[1], 'o', color="green")
         # plt.annotate("(" + str(i[0]) + ";" + str(i[1]) + ")", (i[0], i[1]))
-    tmp_path = os.path.join(path_to_write, name+'.png')
+    tmp_path = ""
+
+    if flag_strain:
+        tmp_path = os.path.join(path_to_write, name + 'strain.png')
+    else:
+        tmp_path = os.path.join(path_to_write, name+'.png')
     plt.savefig(tmp_path)
     # plt.show()
 
 
-def create_plots(graphiks_stuff, path_to_write):
+def create_plots(graphiks_stuff, path_to_write, flag_strain, naming_stuff):
     xs = []
     ys = []
     names = []
     for i in graphiks_stuff.keys():
-        create_plot(graphiks_stuff[i][0], graphiks_stuff[i][1], graphiks_stuff[i][2], graphiks_stuff[i][3], i, path_to_write)
+        create_plot(graphiks_stuff[i][0], graphiks_stuff[i][1], graphiks_stuff[i][2], graphiks_stuff[i][3], i, path_to_write, flag_strain, naming_stuff)
         xs.append(graphiks_stuff[i][0])
         ys.append(graphiks_stuff[i][1])
         names.append(i)
     plt.clf()
     colors = ["blue", "orange", "purple", "brown", "pink", "olive", "cyan"]
     plt.title("All values")
-    plt.xlabel("Time, s")
+    if flag_strain:
+        plt.xlabel("Strain, %")
+    else:
+        plt.xlabel("Time, s")
     plt.ylabel("Stress, N/mm^2")
     for i in range(len(xs)):
         plt.plot(xs[i], ys[i], label=names[i])
     leg = plt.legend(loc='upper right')
-    tmp_path = os.path.join(path_to_write, 'all_in_one.png')
+    tmp_path = ""
+    if flag_strain:
+        tmp_path = os.path.join(path_to_write, 'all_in_one_strain.png')
+    else:
+        tmp_path = os.path.join(path_to_write, 'all_in_one.png')
     plt.savefig(tmp_path)
 
 
@@ -187,38 +232,71 @@ def calc_area_under_curve(coords_x, coords_y, x_value=1e9): # y[координт
     area = simpson(np.array(y_tmp), np.array(x_tmp))
     return area
 
-def create_new_table(path, path_to_write):
+def create_new_table(path, path_to_write, additional_data, meta_data_table_values):
     os.mkdir(path_to_write)
     tmp = xl.load_workbook(path)
     sheets_names = tmp.sheetnames
     new_sheets = {}
     graphiks_stuff = {}
+    strain_graphiks_stuff_dict = {}
     for name in sheets_names:
         if name == "обработка":
             df = pd.read_excel(path, sheet_name=[name], header=None)[name]
             new_sheets["обработка"] = df
             continue
         df = pd.read_excel(path, sheet_name=[name], header=None)[name]
-        tmp = data_preparation(df)
+        if additional_data[-2]:
+            tmp, strain_graphiks_stuff = data_preparation(df, additional_data[-2], additional_data[-1])
+        else:
+            tmp, strain_graphiks_stuff = data_preparation(df, additional_data[-2], additional_data[-1])
         new_sheets[name] = tmp[0]
         graphiks_stuff[name] = tmp[1:]
+        strain_graphiks_stuff_dict[name] = strain_graphiks_stuff
 
-    create_plots(graphiks_stuff, path_to_write)
+
+    comparison_name_to_other = {}
+
+    if additional_data[0]:
+        comparison_name_to_other = {"а2": "30 mm/min", "а1": "60 mm/min", "а3": "6 mm/min", "а4": "3 mm/min", "а5": "0.6 mm/min", "а0": "200 mm/min"}
+    elif additional_data[1]:
+        comparison_name_to_other = {"а2": "20 mm/min", "а1": "60 mm/min", "а3": "6 mm/min", "а4": "2 mm/min", "а5": "0.6 mm/min", "а0": "200 mm/min"}
+    else:
+        comparison_name_to_other = {"а2": "a2", "а1": "a1", "а3": "a3", "а4": "a4", "а5": "a5",
+         "а0": "a6"}
+
+
+
+    if additional_data[2]:
+        create_plots(graphiks_stuff, path_to_write, False, comparison_name_to_other)
+    if additional_data[3]:
+        create_plots(strain_graphiks_stuff_dict, path_to_write, additional_data[3], comparison_name_to_other)
     path_tmp = os.path.join(path_to_write, 'output.xlsx')
     with pd.ExcelWriter(path_tmp) as writer:
         for i in new_sheets.keys():
             new_sheets[i].to_excel(writer, sheet_name=i)
-    path_tmp = os.path.join(path_to_write, 'areas.txt')
-    with open(path_tmp, 'w') as f:
-        for i in graphiks_stuff.keys():
-            f.write(str(i) + ":"+"\n")
-            f.write("Первый максимум [Time, Stress]: "+ str(graphiks_stuff[i][2][0]) + "\n")
-            f.write("Последний максимум [Time, Stress]: " + str(graphiks_stuff[i][2][-1]) + "\n")
-            f.write("Начало полки [Time, Stress]: "+ str(graphiks_stuff[i][3][0]) + "\n")
-            f.write("Площадь до первого максимума: "+ str(calc_area_under_curve(graphiks_stuff[i][0], graphiks_stuff[i][1], graphiks_stuff[i][2][0][0])) + "\n")
-            f.write("Площадь до последнего максимума: "+  str(calc_area_under_curve(graphiks_stuff[i][0], graphiks_stuff[i][1], graphiks_stuff[i][2][-1][0])) + "\n")
-            f.write("Площадь до начала полки: "+ str(calc_area_under_curve(graphiks_stuff[i][0], graphiks_stuff[i][1], graphiks_stuff[i][3][0][0])) + "\n")
-            f.write("\n")
+    path_tmp = os.path.join(path_to_write, 'data.xlsx')
+    list_of_calculed_data = [["Названия"] + [str(i) for i in graphiks_stuff.keys()], ["Первый максимум [Strain, Stress]"], ["Последний максимум [Strain, Stress]"], ["Начало полки [Strain, Stress]"], ["Площадь до первого максимума"], ["Площадь до последнего максимума"], ["Площадь до начала полки"]]
+    for i in strain_graphiks_stuff_dict.keys():
+        list_of_calculed_data[1].append(str(strain_graphiks_stuff_dict[i][2][0]))
+        list_of_calculed_data[2].append(str(strain_graphiks_stuff_dict[i][2][-1]))
+        print(strain_graphiks_stuff_dict[i][3])
+        list_of_calculed_data[3].append(str(strain_graphiks_stuff_dict[i][3][0]))
+    for i in graphiks_stuff.keys():
+        list_of_calculed_data[4].append(str(calc_area_under_curve(graphiks_stuff[i][0], graphiks_stuff[i][1], graphiks_stuff[i][2][0][0])))
+        list_of_calculed_data[5].append(str(calc_area_under_curve(graphiks_stuff[i][0], graphiks_stuff[i][1], graphiks_stuff[i][2][-1][0])))
+        list_of_calculed_data[6].append(str(calc_area_under_curve(graphiks_stuff[i][0], graphiks_stuff[i][1], graphiks_stuff[i][3][0][0])))
+    first_page = pd.DataFrame(list_of_calculed_data)
+    second_page = pd.DataFrame(meta_data_table_values)
+
+    writer = pd.ExcelWriter(path_tmp, engine='xlsxwriter')
+
+    frames = {'Calc_data': first_page, 'Meta_data': second_page}
+    for i in frames.keys():
+        frames[i].to_excel(writer, sheet_name=i)
+    # for sheet, frame in frames.iteritems():  # .use .items for python 3.X
+    #     frame.to_excel(writer, sheet_name=sheet)
+
+    writer._save()
 
 
 
@@ -342,17 +420,6 @@ class ExcelApp(QWidget):
         self.label_meta_data.setFont(myFont)
 
 
-
-
-
-
-
-
-
-
-
-
-
     def openFile(self):
         options = QFileDialog.Options()
         file, _ = QFileDialog.getOpenFileName(self, "Open Excel File", "", "Excel Files (*.xlsx)", options=options)
@@ -372,9 +439,55 @@ class ExcelApp(QWidget):
 
     def start_processing(self):
         self.label.setText(f'Processing...')
+        flag_speed_mode_one = False
+        flag_speed_mode_two = False
+        flag_stress_time = False
+        flag_stress_strain = False
+        recalc_stress = False
+        geom_params = []
+        if self.cb_stress_time.isChecked():
+            flag_stress_time = True
+        if self.cb_stress_strain.isChecked():
+            flag_stress_strain = True
+        if self.cb_speed_mode_one.isChecked():
+            flag_speed_mode_one = True
+        if self.cb_speed_mode_two.isChecked():
+            flag_speed_mode_two = True
+
+        if not self.cb_basic_geom_params.isChecked() and len(self.textbox_thickness.text()) != 0 and len(self.textbox_width.text()) != 0:
+            recalc_stress = True
+            geom_params = [self.textbox_length.text(), float(self.textbox_width.text()), float(self.textbox_thickness.text())]
+
+
+
         if self.save_file_t:
             # print(save_file)
-            create_new_table(self.name_file, self.save_file_t)
+            meta_data_table_values = []
+
+            for row in range(10):
+                tmp_list_meta_data = []
+                for col in range(2):
+                    if self.meta_data_table.item(row, col) is None:
+                        break
+                    tmp_list_meta_data.append(str(self.meta_data_table.item(row, col).text()))
+                if len(tmp_list_meta_data) == 2:
+                    meta_data_table_values.append(tmp_list_meta_data)
+
+            comparison_name_to_other = {}
+            if flag_speed_mode_one:
+                comparison_name_to_other = {"а2": "30 mm/min", "а1": "60 mm/min", "а3": "6 mm/min", "а4": "3 mm/min",
+                                            "а5": "0.6 mm/min", "а0": "200 mm/min"}
+            elif flag_speed_mode_two:
+                comparison_name_to_other = {"а2": "20 mm/min", "а1": "60 mm/min", "а3": "6 mm/min", "а4": "2 mm/min",
+                                            "а5": "0.6 mm/min", "а0": "200 mm/min"}
+            else:
+                comparison_name_to_other = {"а2": "a2", "а1": "a1", "а3": "a3", "а4": "a4", "а5": "a5",
+                                            "а0": "a6"}
+            for i in comparison_name_to_other.keys():
+                meta_data_table_values.append([i, comparison_name_to_other[i]])
+
+            add_data = [flag_speed_mode_one, flag_speed_mode_two, flag_stress_time, flag_stress_strain, recalc_stress, geom_params]
+            create_new_table(self.name_file, self.save_file_t, add_data, meta_data_table_values)
             # shutil.copyfile(self.new_file, save_file)
             self.label.setText(f'Select table')
 
