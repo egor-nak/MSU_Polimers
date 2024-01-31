@@ -78,9 +78,10 @@ class Create_Graph_Window(QtWidgets.QMainWindow):
 
 
 def find_inflections_poins(x, y):
-    smooth = gaussian_filter1d(y, 100)
+    smooth = gaussian_filter1d(y, 15)
     smooth_d2 = np.gradient(np.gradient(smooth))
     infls = np.where(np.diff(np.sign(smooth_d2)))[0]
+    infls = list(set(infls))
     points = []
     for point in infls:
         tmp = []
@@ -88,8 +89,6 @@ def find_inflections_poins(x, y):
             tmp.append([abs(point - y[i]), i])
         tmp = sorted(tmp)
         points.append([x[tmp[0][1]], y[tmp[0][1]]])
-    if len(points) > 1:
-        points = [points[0]]
     return points
 
 
@@ -230,7 +229,7 @@ def data_preparation(df, flag_recalc, geom_params, k_press=3):
 def create_plot(x, y, maxi_points, mini_points, name, path_to_write, flag_strain, naming_stuff, main_class_prop, ind_of_window):
     data_for_graph_window = [x, y]
     plt.clf()
-    points_of_inflections = find_inflections_poins(x, y)
+    # points_of_inflections = find_inflections_poins(x, y)
     if name in naming_stuff.keys():
         plt.title(naming_stuff[name])
         data_for_graph_window.append(naming_stuff[name])
@@ -252,8 +251,8 @@ def create_plot(x, y, maxi_points, mini_points, name, path_to_write, flag_strain
     for i in mini_points:
         plt.plot(i[0], i[1], 'o', color="green")
         # plt.annotate("(" + str(i[0]) + ";" + str(i[1]) + ")", (i[0], i[1]))
-    for i in points_of_inflections:
-        plt.plot(i[0], i[1], 'o', color="yellow")
+    # for i in points_of_inflections:
+    #     plt.plot(i[0], i[1], 'o', color="yellow")
     tmp_path = ""
 
     if flag_strain:
@@ -365,7 +364,7 @@ def create_new_table(main_class_prop, path, path_to_write, additional_data, meta
         list_of_calculed_data[4].append(str(calc_area_under_curve(graphiks_stuff[i][0], graphiks_stuff[i][1], graphiks_stuff[i][2][0][0])))
         list_of_calculed_data[5].append(str(calc_area_under_curve(graphiks_stuff[i][0], graphiks_stuff[i][1], graphiks_stuff[i][2][-1][0])))
         list_of_calculed_data[6].append(str(calc_area_under_curve(graphiks_stuff[i][0], graphiks_stuff[i][1], graphiks_stuff[i][3][0][0])))
-        list_of_calculed_data[7].append(str(find_inflections_poins(strain_graphiks_stuff_dict[i][0], strain_graphiks_stuff_dict[i][1])))
+        # list_of_calculed_data[7].append(str(find_inflections_poins(strain_graphiks_stuff_dict[i][0], strain_graphiks_stuff_dict[i][1])))
     first_page = pd.DataFrame(list_of_calculed_data)
     second_page = pd.DataFrame(meta_data_table_values)
 
