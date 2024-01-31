@@ -26,6 +26,9 @@ from datetime import date
 import sys
 import matplotlib
 matplotlib.use('Qt5Agg')
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.ndimage import gaussian_filter1d
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
@@ -74,7 +77,20 @@ class Create_Graph_Window(QtWidgets.QMainWindow):
 
 
 
-
+def find_inflections_poins(x, y):
+    smooth = gaussian_filter1d(y, 100)
+    smooth_d2 = np.gradient(np.gradient(smooth))
+    infls = np.where(np.diff(np.sign(smooth_d2)))[0]
+    points = []
+    for point in infls:
+        tmp = []
+        for i in range(len(x)):
+            tmp.append([abs(point - y[i]), i])
+        tmp = sorted(tmp)
+        points.append([x[tmp[0][1]], y[tmp[0][1]]])
+    if len(points) > 1:
+        points = [points[0]]
+    return points
 
 
 def sum_massives(x, y):
@@ -207,12 +223,14 @@ def data_preparation(df, flag_recalc, geom_params, k_press=3):
     final_data = pd.DataFrame(final_data)
     # print(type(final_data), type(df_head_stuff))
     final_data = pd.concat([df_head_stuff, final_data])
+
     return [[final_data, tmp_X, tmp_Y, maxi_points, mini_points], [tmp_X_new_strain, tmp_Y, maxi_points_new_strain, mini_points_new_strain]]
 
 
 def create_plot(x, y, maxi_points, mini_points, name, path_to_write, flag_strain, naming_stuff, main_class_prop, ind_of_window):
     data_for_graph_window = [x, y]
     plt.clf()
+    points_of_inflections = find_inflections_poins(x, y)
     if name in naming_stuff.keys():
         plt.title(naming_stuff[name])
         data_for_graph_window.append(naming_stuff[name])
@@ -234,6 +252,8 @@ def create_plot(x, y, maxi_points, mini_points, name, path_to_write, flag_strain
     for i in mini_points:
         plt.plot(i[0], i[1], 'o', color="green")
         # plt.annotate("(" + str(i[0]) + ";" + str(i[1]) + ")", (i[0], i[1]))
+    for i in points_of_inflections:
+        plt.plot(i[0], i[1], 'o', color="yellow")
     tmp_path = ""
 
     if flag_strain:
@@ -289,6 +309,10 @@ def calc_area_under_curve(coords_x, coords_y, x_value=1e9): # y[координт
     area = simpson(np.array(y_tmp), np.array(x_tmp))
     return area
 
+
+
+
+
 def create_new_table(main_class_prop, path, path_to_write, additional_data, meta_data_table_values):
     os.mkdir(path_to_write)
     tmp = xl.load_workbook(path)
@@ -332,16 +356,16 @@ def create_new_table(main_class_prop, path, path_to_write, additional_data, meta
         for i in new_sheets.keys():
             new_sheets[i].to_excel(writer, sheet_name=i)
     path_tmp = os.path.join(path_to_write, 'data.xlsx')
-    list_of_calculed_data = [["Названия"] + [str(i) for i in graphiks_stuff.keys()], ["Первый максимум [Strain, Stress]"], ["Последний максимум [Strain, Stress]"], ["Начало полки [Strain, Stress]"], ["Площадь до первого максимума"], ["Площадь до последнего максимума"], ["Площадь до начала полки"]]
+    list_of_calculed_data = [["Названия"] + [str(i) for i in graphiks_stuff.keys()], ["Первый максимум [Strain, Stress]"], ["Последний максимум [Strain, Stress]"], ["Начало полки [Strain, Stress]"], ["Площадь до первого максимума"], ["Площадь до последнего максимума"], ["Площадь до начала полки"], ["Точки перегиба [Strain, Stress]"]]
     for i in strain_graphiks_stuff_dict.keys():
         list_of_calculed_data[1].append(str(strain_graphiks_stuff_dict[i][2][0]))
         list_of_calculed_data[2].append(str(strain_graphiks_stuff_dict[i][2][-1]))
-        print(strain_graphiks_stuff_dict[i][3])
         list_of_calculed_data[3].append(str(strain_graphiks_stuff_dict[i][3][0]))
     for i in graphiks_stuff.keys():
         list_of_calculed_data[4].append(str(calc_area_under_curve(graphiks_stuff[i][0], graphiks_stuff[i][1], graphiks_stuff[i][2][0][0])))
         list_of_calculed_data[5].append(str(calc_area_under_curve(graphiks_stuff[i][0], graphiks_stuff[i][1], graphiks_stuff[i][2][-1][0])))
         list_of_calculed_data[6].append(str(calc_area_under_curve(graphiks_stuff[i][0], graphiks_stuff[i][1], graphiks_stuff[i][3][0][0])))
+        list_of_calculed_data[7].append(str(find_inflections_poins(strain_graphiks_stuff_dict[i][0], strain_graphiks_stuff_dict[i][1])))
     first_page = pd.DataFrame(list_of_calculed_data)
     second_page = pd.DataFrame(meta_data_table_values)
 
