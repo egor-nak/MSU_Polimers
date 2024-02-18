@@ -368,15 +368,19 @@ def create_new_table(main_class_prop, path, path_to_write, additional_data, meta
     first_page = pd.DataFrame(list_of_calculed_data)
     second_page = pd.DataFrame(meta_data_table_values)
 
-    writer = pd.ExcelWriter(path_tmp, engine='xlsxwriter')
+    # writer = pd.ExcelWriter(path_tmp, engine='xlsxwriter')
+    #
+    # frames = {'Calc_data': first_page, 'Meta_data': second_page}
+    # for i in frames.keys():
+    #     frames[i].to_excel(writer, sheet_name=i)
+    # # for sheet, frame in frames.iteritems():  # .use .items for python 3.X
+    # #     frame.to_excel(writer, sheet_name=sheet)
+    #
+    # writer._save()
 
-    frames = {'Calc_data': first_page, 'Meta_data': second_page}
-    for i in frames.keys():
-        frames[i].to_excel(writer, sheet_name=i)
-    # for sheet, frame in frames.iteritems():  # .use .items for python 3.X
-    #     frame.to_excel(writer, sheet_name=sheet)
-
-    writer._save()
+    with pd.ExcelWriter(path_tmp) as excel_writer:
+        first_page.to_excel(excel_writer, sheet_name='Calc_data', index=False)
+        second_page.to_excel(excel_writer, sheet_name='Meta_data', index=False)
 
 
 
@@ -581,3 +585,4 @@ if __name__ == '__main__':
     ex = ExcelApp()
     ex.show()
     sys.exit(app.exec_())
+
